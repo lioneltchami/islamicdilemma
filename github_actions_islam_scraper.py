@@ -519,44 +519,55 @@ class GitHubActionsIslamScraper:
     def scrape_articles(self, mode='incremental', max_pages=None, delay=2):
         """Main scraping method"""
         start_time = datetime.now()
-        
+
         if mode == 'historical':
             logger.info(f"🚀 Starting HISTORICAL scrape")
             max_pages = max_pages or 999999  # Unlimited
         else:
             logger.info(f"🔄 Starting INCREMENTAL scrape")
             max_pages = max_pages or 5
-        
+
         logger.info(f"📊 Current database has {self.get_article_count()} articles")
-        
+
         current_url = self.base_url
         page_count = 0
         total_new_articles = 0
         total_articles_found = 0
-        
+        visited_urls = set()  # Track all visited URLs to prevent loops
+
         while current_url and page_count < max_pages:
+            # Check if we've already visited this URL (prevent loops)
+            if current_url in visited_urls:
+                logger.info(f"🔄 LOOP DETECTED! Already visited: {current_url}")
+                logger.info("🔚 Breaking to prevent infinite loop")
+                break
+
+            visited_urls.add(current_url)
             page_count += 1
             logger.info(f"\n📄 Page {page_count} | Elapsed: {datetime.now() - start_time}")
-            
+
             articles, soup, new_articles = self.scrape_page(current_url)
             total_articles_found += len(articles)
             total_new_articles += new_articles
-            
+
             # For incremental mode, stop if no new articles on first 2 pages
             if mode == 'incremental' and page_count >= 2 and total_new_articles == 0:
                 logger.info("✅ No new articles found - database is up to date!")
                 break
-            
+
             if soup:
                 next_url = self.find_next_page_url(soup)
-                if next_url and next_url != current_url:
+                if next_url and next_url not in visited_urls:
                     current_url = next_url
                 else:
-                    logger.info("🔚 No more pages found - reached the end!")
+                    if next_url in visited_urls:
+                        logger.info(f"🔄 Next URL already visited - stopping to prevent loop")
+                    else:
+                        logger.info("🔚 No more pages found - reached the end!")
                     break
             else:
                 break
-            
+
             time.sleep(delay)
         
         duration = datetime.now() - start_time
