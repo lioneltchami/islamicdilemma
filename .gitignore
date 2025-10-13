@@ -38,10 +38,10 @@ Thumbs.db
 backup_*.json
 backup_*.db
 
-# Test outputs
-*test*/
+# Test outputs (but keep tests/ directory)
 enhanced_articles_test/
 articles_archive_test/
+*_test/
 
 # Large data files (keep structured but not content)
 articles_archive/html_articles/*
