@@ -1,0 +1,266 @@
+name: Scrape Islam Articles
+
+on:
+  schedule:
+    # Run every 6 hours
+    - cron: '0 */6 * * *'
+    # Run daily at 6 AM UTC
+    - cron: '0 6 * * *'
+    # Run weekly full scrape on Sundays at 2 AM UTC
+    - cron: '0 2 * * 0'
+  
+  # Allow manual trigger
+  workflow_dispatch:
+    inputs:
+      scrape_mode:
+        description: 'Scraping mode'
+        required: true
+        default: 'incremental'
+        type: choice
+        options:
+        - incremental
+        - historical
+        - full_historical
+      max_pages:
+        description: 'Maximum pages to scrape (optional)'
+        required: false
+        type: number
+      delay:
+        description: 'Delay between requests (seconds)'
+        required: false
+        default: '2'
+        type: number
+
+env:
+  PYTHONUNBUFFERED: 1
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        # Fetch full history to preserve database
+        fetch-depth: 0
+        # Use a PAT to allow pushing back to repo
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install requests beautifulsoup4 lxml python-dateutil pytz
+
+    - name: Determine scrape mode
+      id: mode
+      run: |
+        if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+          echo "mode=${{ github.event.inputs.scrape_mode }}" >> $GITHUB_OUTPUT
+          echo "max_pages=${{ github.event.inputs.max_pages }}" >> $GITHUB_OUTPUT
+          echo "delay=${{ github.event.inputs.delay }}" >> $GITHUB_OUTPUT
+        elif [[ "${{ github.event.schedule }}" == "0 2 * * 0" ]]; then
+          echo "mode=weekly_full" >> $GITHUB_OUTPUT
+          echo "max_pages=" >> $GITHUB_OUTPUT
+          echo "delay=3" >> $GITHUB_OUTPUT
+        elif [[ "${{ github.event.schedule }}" == "0 6 * * *" ]]; then
+          echo "mode=daily" >> $GITHUB_OUTPUT
+          echo "max_pages=10" >> $GITHUB_OUTPUT
+          echo "delay=2" >> $GITHUB_OUTPUT
+        else
+          echo "mode=incremental" >> $GITHUB_OUTPUT
+          echo "max_pages=5" >> $GITHUB_OUTPUT
+          echo "delay=2" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Show scraping plan
+      run: |
+        echo "🔍 Scraping Mode: ${{ steps.mode.outputs.mode }}"
+        echo "📄 Max Pages: ${{ steps.mode.outputs.max_pages }}"
+        echo "⏱️  Delay: ${{ steps.mode.outputs.delay }}s"
+        echo "🕐 Triggered by: ${{ github.event_name }}"
+        if [[ "${{ github.event_name }}" == "schedule" ]]; then
+          echo "📅 Schedule: ${{ github.event.schedule }}"
+        fi
+
+    - name: Run Islam Articles Scraper
+      run: |
+        # Set parameters based on mode
+        MODE="${{ steps.mode.outputs.mode }}"
+        MAX_PAGES="${{ steps.mode.outputs.max_pages }}"
+        DELAY="${{ steps.mode.outputs.delay }}"
+        
+        # Build command
+        CMD="python github_actions_islam_scraper.py"
+        
+        case $MODE in
+          "incremental"|"daily")
+            CMD="$CMD --mode incremental"
+            if [[ -n "$MAX_PAGES" ]]; then
+              CMD="$CMD --max-pages $MAX_PAGES"
+            fi
+            ;;
+          "historical"|"full_historical")
+            CMD="$CMD --mode historical"
+            if [[ -n "$MAX_PAGES" ]]; then
+              CMD="$CMD --max-pages $MAX_PAGES"
+            fi
+            ;;
+          "weekly_full")
+            CMD="$CMD --mode historical --max-pages 50"
+            ;;
+        esac
+        
+        if [[ -n "$DELAY" ]]; then
+          CMD="$CMD --delay $DELAY"
+        fi
+        
+        echo "🚀 Running: $CMD"
+        $CMD
+
+    - name: Generate summary report
+      run: |
+        python -c "
+        import json
+        import sqlite3
+        from datetime import datetime
+        
+        # Read database stats
+        conn = sqlite3.connect('islam_articles.db')
+        cursor = conn.cursor()
+        
+        cursor.execute('SELECT COUNT(*) FROM articles')
+        total_articles = cursor.fetchone()[0]
+        
+        cursor.execute('SELECT COUNT(*) FROM scraping_log WHERE run_date > datetime(\"now\", \"-1 day\")')
+        recent_runs = cursor.fetchone()[0]
+        
+        cursor.execute('SELECT SUM(new_articles) FROM scraping_log WHERE run_date > datetime(\"now\", \"-1 day\")')
+        new_today = cursor.fetchone()[0] or 0
+        
+        cursor.execute('SELECT matching_keyword, COUNT(*) FROM articles GROUP BY matching_keyword ORDER BY COUNT(*) DESC LIMIT 5')
+        top_keywords = cursor.fetchall()
+        
+        conn.close()
+        
+        # Generate summary
+        summary = f'''## 📊 Scraping Summary - {datetime.now().strftime(\"%Y-%m-%d %H:%M UTC\")}
+        
+        **📈 Database Statistics:**
+        - Total Articles: {total_articles}
+        - New Articles Today: {new_today}
+        - Scraping Runs Today: {recent_runs}
+        
+        **🔍 Top Keywords:**
+        ''' + '\\n'.join([f'- {keyword}: {count} articles' for keyword, count in top_keywords])
+        
+        # Write to file
+        with open('scraping_summary.md', 'w') as f:
+            f.write(summary)
+        
+        print(summary)
+        "
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: islam-articles-data-${{ github.run_number }}
+        path: |
+          islam_articles.db
+          all_islam_articles.json
+          scraping_summary.md
+          *.log
+        retention-days: 30
+
+    - name: Commit and push changes
+      run: |
+        # Configure git
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        
+        # Add files
+        git add -A
+        
+        # Check if there are changes
+        if git diff --staged --quiet; then
+          echo "No changes to commit"
+        else
+          # Commit with timestamp
+          TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M UTC")
+          git commit -m "📊 Update Islam articles database - $TIMESTAMP
+          
+          Mode: ${{ steps.mode.outputs.mode }}
+          Run: #${{ github.run_number }}
+          
+          🤖 Automated scraping via GitHub Actions"
+          
+          # Push changes
+          git push
+          echo "✅ Changes committed and pushed"
+        fi
+
+    - name: Create release on major updates
+      if: steps.mode.outputs.mode == 'weekly_full' || steps.mode.outputs.mode == 'historical'
+      run: |
+        # Get article count
+        ARTICLE_COUNT=$(python -c "
+        import sqlite3
+        conn = sqlite3.connect('islam_articles.db')
+        cursor = conn.cursor()
+        cursor.execute('SELECT COUNT(*) FROM articles')
+        print(cursor.fetchone()[0])
+        conn.close()
+        ")
+        
+        # Create release
+        TAG="data-$(date +%Y%m%d-%H%M)"
+        
+        gh release create "$TAG" \
+          --title "📚 Islam Articles Database - $(date '+%Y-%m-%d')" \
+          --notes "**Complete database backup**
+        
+        📊 **Statistics:**
+        - Total Articles: $ARTICLE_COUNT
+        - Scrape Mode: ${{ steps.mode.outputs.mode }}
+        - Generated: $(date -u +'%Y-%m-%d %H:%M UTC')
+        
+        📁 **Files:**
+        - \`islam_articles.db\` - SQLite database with all articles
+        - \`all_islam_articles.json\` - JSON export
+        - \`scraping_summary.md\` - Detailed statistics
+        
+        🤖 Auto-generated by GitHub Actions" \
+          islam_articles.db \
+          all_islam_articles.json \
+          scraping_summary.md
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Send notification on failure
+      if: failure()
+      run: |
+        echo "❌ Scraping failed!"
+        echo "::error::Islam articles scraping failed. Check the logs for details."
+        
+        # Create issue on failure (optional)
+        if [[ "${{ steps.mode.outputs.mode }}" == "historical" ]]; then
+          gh issue create \
+            --title "🚨 Islam Articles Scraper Failed - $(date '+%Y-%m-%d')" \
+            --body "The Islam articles scraper failed during a ${{ steps.mode.outputs.mode }} run.
+            
+            **Details:**
+            - Run: #${{ github.run_number }}
+            - Mode: ${{ steps.mode.outputs.mode }}
+            - Time: $(date -u +'%Y-%m-%d %H:%M UTC')
+            
+            Please check the [action logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) for details." \
+            --assignee "${{ github.actor }}" || true
+        fi
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

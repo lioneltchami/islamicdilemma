@@ -1,0 +1,58 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Virtual environments
+islam_scraper_env/
+scraper_env/
+
+# Logs
+*.log
+logs/
+scraper*.log
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Database backups
+backup_*.json
+backup_*.db
+
+# Test outputs
+*test*/
+enhanced_articles_test/
+articles_archive_test/
+
+# Large data files (keep structured but not content)
+articles_archive/html_articles/*
+articles_archive/markdown_articles/*
+!articles_archive/html_articles/.gitkeep
+!articles_archive/markdown_articles/.gitkeep
+
+# But keep database and exports for continuity
+# articles_archive/islam_articles.db
+# articles_archive/exports/
+
+# Environment variables
+.env
+.env.local
