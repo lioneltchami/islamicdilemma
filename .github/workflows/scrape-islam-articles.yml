@@ -1,15 +1,7 @@
-name: Scrape Islam Articles
+name: Scrape Islam Articles Manual
 
 on:
-  schedule:
-    # Run every 6 hours
-    - cron: '0 */6 * * *'
-    # Run daily at 6 AM UTC
-    - cron: '0 6 * * *'
-    # Run weekly full scrape on Sundays at 2 AM UTC
-    - cron: '0 2 * * 0'
-  
-  # Allow manual trigger
+  # Allow manual trigger (must be first for visibility)
   workflow_dispatch:
     inputs:
       scrape_mode:
@@ -30,6 +22,14 @@ on:
         required: false
         default: '2'
         type: number
+  
+  schedule:
+    # Run every 6 hours
+    - cron: '0 */6 * * *'
+    # Run daily at 6 AM UTC
+    - cron: '0 6 * * *'
+    # Run weekly full scrape on Sundays at 2 AM UTC
+    - cron: '0 2 * * 0'
 
 # Grant necessary permissions for the workflow to push changes and create releases
 permissions:
