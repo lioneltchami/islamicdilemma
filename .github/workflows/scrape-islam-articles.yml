@@ -1,28 +1,6 @@
-name: Scrape Islam Articles Manual
+name: 🕒 Auto Scheduled Islam Articles
 
 on:
-  # Allow manual trigger (must be first for visibility)
-  workflow_dispatch:
-    inputs:
-      scrape_mode:
-        description: 'Scraping mode'
-        required: true
-        default: 'incremental'
-        type: choice
-        options:
-        - incremental
-        - historical
-        - full_historical
-      max_pages:
-        description: 'Maximum pages to scrape (optional)'
-        required: false
-        type: number
-      delay:
-        description: 'Delay between requests (seconds)'
-        required: false
-        default: '2'
-        type: number
-  
   schedule:
     # Run every 6 hours
     - cron: '0 */6 * * *'

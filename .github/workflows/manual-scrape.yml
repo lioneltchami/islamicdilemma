@@ -1,0 +1,214 @@
+name: 🔧 Manual Scrape Islam Articles
+
+# MANUAL TRIGGER ONLY - No schedules
+on:
+  workflow_dispatch:
+    inputs:
+      scrape_mode:
+        description: 'Scraping mode'
+        required: true
+        default: 'incremental'
+        type: choice
+        options:
+        - incremental
+        - historical
+        - full_historical
+      max_pages:
+        description: 'Maximum pages to scrape (leave empty for no limit)'
+        required: false
+        type: number
+      delay:
+        description: 'Delay between requests (seconds)'
+        required: false
+        default: '2'
+        type: number
+
+permissions:
+  contents: write
+  issues: write
+  actions: read
+
+env:
+  PYTHONUNBUFFERED: 1
+
+jobs:
+  manual-scrape:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: ✅ Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: 🐍 Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+
+    - name: 📦 Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: 🔧 Install GitHub CLI
+      run: |
+        curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+        echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+        sudo apt update
+        sudo apt install gh -y
+
+    - name: 📋 Show manual scraping plan
+      run: |
+        echo "🚀 MANUAL TRIGGER ACTIVATED!"
+        echo "🔍 Scraping Mode: ${{ github.event.inputs.scrape_mode }}"
+        echo "📄 Max Pages: ${{ github.event.inputs.max_pages || 'No limit' }}"
+        echo "⏱️  Delay: ${{ github.event.inputs.delay }}s"
+        echo "👤 Triggered by: ${{ github.actor }}"
+        echo "🕐 Time: $(date -u +'%Y-%m-%d %H:%M UTC')"
+
+    - name: 🕸️ Run Islam Articles Scraper
+      run: |
+        MODE="${{ github.event.inputs.scrape_mode }}"
+        MAX_PAGES="${{ github.event.inputs.max_pages }}"
+        DELAY="${{ github.event.inputs.delay }}"
+        
+        CMD="python github_actions_islam_scraper.py"
+        
+        case $MODE in
+          "incremental")
+            CMD="$CMD --mode incremental"
+            ;;
+          "historical"|"full_historical")
+            CMD="$CMD --mode historical"
+            ;;
+        esac
+        
+        if [[ -n "$MAX_PAGES" ]]; then
+          CMD="$CMD --max-pages $MAX_PAGES"
+        fi
+        
+        if [[ -n "$DELAY" ]]; then
+          CMD="$CMD --delay $DELAY"
+        fi
+        
+        echo "🚀 Running: $CMD"
+        $CMD
+
+    - name: 📊 Generate summary report
+      run: |
+        python -c "
+        import json
+        import sqlite3
+        import os
+        from datetime import datetime
+
+        if not os.path.exists('islam_articles.db'):
+            print('⚠️  No database found yet. This might be the first run.')
+            summary = f'''## 📊 Manual Scraping Summary - {datetime.now().strftime(\"%Y-%m-%d %H:%M UTC\")}
+
+            **🆕 First Run:**
+            - Database created
+            - Manual scraping completed by ${{ github.actor }}
+            - Mode: ${{ github.event.inputs.scrape_mode }}
+            '''
+            with open('manual_scraping_summary.md', 'w') as f:
+                f.write(summary)
+            print(summary)
+        else:
+            conn = sqlite3.connect('islam_articles.db')
+            cursor = conn.cursor()
+
+            cursor.execute('SELECT COUNT(*) FROM articles')
+            total_articles = cursor.fetchone()[0]
+
+            cursor.execute('SELECT COUNT(*) FROM scraping_log WHERE run_date > datetime(\"now\", \"-1 hour\")')
+            recent_runs = cursor.fetchone()[0]
+
+            cursor.execute('SELECT SUM(new_articles) FROM scraping_log WHERE run_date > datetime(\"now\", \"-1 hour\")')
+            new_this_run = cursor.fetchone()[0] or 0
+
+            conn.close()
+
+            summary = f'''## 📊 Manual Scraping Summary - {datetime.now().strftime(\"%Y-%m-%d %H:%M UTC\")}
+
+            **🎯 Manual Run Results:**
+            - Total Articles: {total_articles}
+            - New Articles This Run: {new_this_run}
+            - Mode: ${{ github.event.inputs.scrape_mode }}
+            - Triggered by: ${{ github.actor }}
+            '''
+
+            with open('manual_scraping_summary.md', 'w') as f:
+                f.write(summary)
+
+            print(summary)
+        "
+
+    - name: 📁 Generate all file formats
+      run: |
+        if [ ! -f "islam_articles.db" ]; then
+          echo "⚠️  Database not found. Skipping file generation."
+          mkdir -p articles_archive
+          echo "Manual run - no articles to generate yet" > articles_archive/README.txt
+        else
+          python scripts/generate_files_from_database.py --database islam_articles.db --output articles_archive
+          tar -czf complete-articles-archive.tar.gz articles_archive/
+          
+          echo "📁 Generated files:"
+          ls -la articles_archive/
+          if [ -d "articles_archive/html_articles" ]; then
+            echo "📄 HTML files: $(find articles_archive/html_articles -name '*.html' | wc -l)"
+          fi
+          if [ -d "articles_archive/markdown_articles" ]; then
+            echo "📝 Markdown files: $(find articles_archive/markdown_articles -name '*.md' | wc -l)"
+          fi
+        fi
+
+    - name: 📤 Upload manual run artifacts
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: manual-scrape-${{ github.event.inputs.scrape_mode }}-${{ github.run_number }}
+        path: |
+          articles_archive/
+          complete-articles-archive.tar.gz
+          islam_articles.db
+          all_islam_articles.json
+          manual_scraping_summary.md
+          *.log
+        retention-days: 90
+        if-no-files-found: warn
+
+    - name: 💾 Commit and push changes
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add -A
+        
+        if git diff --staged --quiet; then
+          echo "No changes to commit"
+        else
+          TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M UTC")
+          git commit -m "📊 Manual scrape by ${{ github.actor }} - $TIMESTAMP
+          
+          Mode: ${{ github.event.inputs.scrape_mode }}
+          Max Pages: ${{ github.event.inputs.max_pages || 'No limit' }}
+          Delay: ${{ github.event.inputs.delay }}s
+          Run: #${{ github.run_number }}
+          
+          🤖 Manual trigger via GitHub Actions"
+          
+          git push
+          echo "✅ Changes committed and pushed"
+        fi
+
+    - name: 🎉 Success notification
+      if: success()
+      run: |
+        echo "✅ Manual scraping completed successfully!"
+        echo "👤 Triggered by: ${{ github.actor }}"
+        echo "🔍 Mode: ${{ github.event.inputs.scrape_mode }}"
+        echo "📊 Check artifacts for results"
