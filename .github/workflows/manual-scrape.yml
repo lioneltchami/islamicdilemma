@@ -154,7 +154,7 @@ jobs:
           mkdir -p articles_archive
           echo "Manual run - no articles to generate yet" > articles_archive/README.txt
         else
-          python scripts/generate_files_from_database.py --database islam_articles.db --output articles_archive
+          python scripts/generate_files_from_database.py --database islam_articles.db --output articles_archive --force
           tar -czf complete-articles-archive.tar.gz articles_archive/
           
           echo "📁 Generated files:"

@@ -183,7 +183,7 @@ jobs:
           echo "First run - no articles to generate yet" > articles_archive/README.txt
         else
           # Generate HTML, Markdown, and Website files from database
-          python scripts/generate_files_from_database.py --database islam_articles.db --output articles_archive
+          python scripts/generate_files_from_database.py --database islam_articles.db --output articles_archive --force
 
           # Create compressed archive for easy download
           tar -czf complete-articles-archive.tar.gz articles_archive/
