@@ -1,9 +1,9 @@
-## 📊 Scraping Summary - 2025-12-14 18:19 UTC
+## 📊 Scraping Summary - 2025-12-15 01:07 UTC
 
     **📈 Database Statistics:**
     - Total Articles: 517
     - New Articles Today: 8
-    - Scraping Runs Today: 11
+    - Scraping Runs Today: 7
 
     **🔍 Top Keywords:**
     - islam: 320 articles
