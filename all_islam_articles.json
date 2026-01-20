@@ -1,5 +1,60 @@
 [
   {
+    "url": "https://www.maxshimbaministries.org/2026/01/the-dual-nature-of-christ-jesus-fully.html",
+    "title": "The Dual Nature of Christ Jesus: Fully God and Fully Man",
+    "content_preview": "",
+    "publish_date": "January 19, 2026",
+    "publish_date_parsed": "2026-01-19T00:00:00",
+    "date_source": "content_regex",
+    "scraped_at": "2026-01-20T01:07:16.046668",
+    "matching_keyword": "dua",
+    "word_count": 0
+  },
+  {
+    "url": "https://www.maxshimbaministries.org/2026/01/muhammad-was-prophet-for-arabs-only.html",
+    "title": "Muhammad was a prophet for the Arabs only",
+    "content_preview": "",
+    "publish_date": "January 19, 2026",
+    "publish_date_parsed": "2026-01-19T00:00:00",
+    "date_source": "content_regex",
+    "scraped_at": "2026-01-20T01:07:15.954709",
+    "matching_keyword": "muhammad",
+    "word_count": 0
+  },
+  {
+    "url": "https://www.maxshimbaministries.org/2026/01/allah-claims-world-has-two-easts-and.html",
+    "title": "Allah claims the world has two Easts and two Wests. Surah Ar Rahman Ayah 17",
+    "content_preview": "",
+    "publish_date": "January 19, 2026",
+    "publish_date_parsed": "2026-01-19T00:00:00",
+    "date_source": "content_regex",
+    "scraped_at": "2026-01-20T01:07:15.900376",
+    "matching_keyword": "allah",
+    "word_count": 0
+  },
+  {
+    "url": "https://www.maxshimbaministries.org/2026/01/allah-claims-world-has-two-easts-and_19.html",
+    "title": "Allah claims the world has two Easts and two Wests. Surah Ar Rahman Ayah 17",
+    "content_preview": "",
+    "publish_date": "January 19, 2026",
+    "publish_date_parsed": "2026-01-19T00:00:00",
+    "date_source": "content_regex",
+    "scraped_at": "2026-01-20T01:07:15.846149",
+    "matching_keyword": "allah",
+    "word_count": 0
+  },
+  {
+    "url": "https://www.maxshimbaministries.org/2026/01/muhammad-was-white-man-according-to.html",
+    "title": "Muhammad was a white man, according to Sahih Al-Bukhari",
+    "content_preview": "",
+    "publish_date": "January 19, 2026",
+    "publish_date_parsed": "2026-01-19T00:00:00",
+    "date_source": "content_regex",
+    "scraped_at": "2026-01-20T01:07:15.797161",
+    "matching_keyword": "muhammad",
+    "word_count": 0
+  },
+  {
     "url": "https://www.maxshimbaministries.org/2026/01/muhammad-was-given-prophethood-by-his.html",
     "title": "Muhammad was given prophethood by his wife Khadija",
     "content_preview": "",
